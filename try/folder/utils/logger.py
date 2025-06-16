@@ -1,20 +1,4 @@
-# import re
-# from fpdf import FPDF
 
-# def sanitize_text(text: str) -> str:
-#     return re.sub(r'[^\x00-\x7F]+', '', text)
-
-# def save_to_pdf(content: str, filename="output.pdf"):
-#     pdf = FPDF()
-#     pdf.add_page()
-#     pdf.set_auto_page_break(auto=True, margin=15)
-#     pdf.set_font("Arial", size=12)
-
-#     for line in content.split("\n"):
-#         pdf.multi_cell(0, 10, line)
-
-#     pdf.output(filename)
-#     print(f"[✅] PDF saved: {filename}")
 
 import re
 from fpdf import FPDF
