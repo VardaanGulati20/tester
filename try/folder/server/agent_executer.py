@@ -10,32 +10,6 @@ import os
 load_dotenv()
 
 
-# llm = ChatGroq(
-#     temperature=0,
-#     model_name="llama3-8b-8192",
-#     api_key=GROQ_API_KEY,
-# )
-
-# async def get_agent_response(reference_site, query):
-#     tool = MCPTool(
-#         name="custom_search",
-#         description=f"Extract content from {reference_site}",
-#         serp_api_key=SERP_API_KEY,
-#         reference_site=reference_site
-#     )
-
-#     agent = initialize_agent(
-#         tools=[tool],
-#         llm=llm,
-#         agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
-#         verbose=True,
-#         max_iterations=3
-#     )
-
-#     result = agent.run(query)
-#     sanitized = sanitize_text(result)
-#     save_to_pdf(sanitized)
-#     return sanitized
 
 llm = ChatGroq(
     temperature=0,
