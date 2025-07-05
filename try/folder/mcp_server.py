@@ -1,11 +1,10 @@
-
 from fastapi import FastAPI
 from pydantic import BaseModel
+from server.tools.dynamic_scraper_tool import scrape_web
+import requests
 from langchain.prompts import PromptTemplate
-from langchain.chains.llm import LLMChain
+from langchain.chains import LLMChain
 from langchain_groq import ChatGroq
-from logger import sanitize_text, save_to_pdf
-from server.tools.dynamic_scraper_tool import DynamicScraperTool
 import os
 from dotenv import load_dotenv
 
@@ -13,69 +12,69 @@ load_dotenv()
 
 app = FastAPI()
 
-@app.get("/")
-def root():
-    return {"message": "✅ MCP Educational Server running. POST to /invoke."}
 
-# LLM setup
 llm = ChatGroq(
     temperature=0,
-    model_name="llama3-8b-8192",
-    api_key=os.getenv("GROQ_API_KEY")
+    model_name="llama3-70b-8192",
+    groq_api_key=os.getenv("GROQ_API_KEY")
 )
 
-fallback_prompt = PromptTemplate(
-    input_variables=["input"],
-    template="""
-You are a helpful educational assistant. Based on the user query below, generate a clear, structured, and useful output.
-
-User Query:
-{input}
-
-Provide directly relevant, actionable information.
-"""
-)
-
-class RequestModel(BaseModel):
+class QuestionInput(BaseModel):
     input: str
-    context: dict = {}
+
+CRITIC_URL = "http://localhost:8002/evaluate"
 
 @app.post("/invoke")
-async def invoke(request: RequestModel):
-    query = request.input
-    context = request.context or {}
+def invoke_tool(input: QuestionInput):
+    question = input.input
 
+    # === PHASE 1: SCRAPING ===
+    scraped_content = scrape_web(question)
+    initial_answer = scraped_content
+
+    # === PHASE 2: INITIAL CRITIC EVALUATION ===
+    critic_payload_1 = {"question": question, "answer": initial_answer}
     try:
-        tool = DynamicScraperTool(
-            name="dynamic_scraper",
-            description="Dynamically scrapes content using SerpAPI and summarizes",
-            serp_api_key=os.getenv("SERP_API_KEY"),
-            llm=llm
-        )
-
-        scraped_result = tool._run(query)
-        scraped_result = sanitize_text(scraped_result)
-
-        if "No useful content" in scraped_result or scraped_result.strip() == "":
-            print("[⚠️] No educational content found. Falling back to direct LLM generation...")
-            chain = LLMChain(prompt=fallback_prompt, llm=llm)
-            final_answer = chain.run({"input": query})
-        else:
-            final_answer = "Content successfully extracted and summarized from trusted websites."
-
-        final_answer = sanitize_text(final_answer)
-        query = sanitize_text(query)
-
-        full_output = (
-            f"Final Agent Answer:\n{final_answer}\n\n"
-            f"Full Scraped Content:\n{scraped_result}"
-        )
-
-        save_to_pdf(full_output, question=query)
-
-        return {"output": full_output}
-
+        r1 = requests.post(CRITIC_URL, json=critic_payload_1).json()
+        score_1 = r1.get("score", 0)
+        critic_feedback_1 = r1.get("feedback", "")
     except Exception as e:
-        return {"output": f"[❌] Error: {str(e)}"}
+        score_1 = 0
+        critic_feedback_1 = f"Critic 1 failed: {e}"
+
+    # === PHASE 3: LLM IMPROVEMENT (only if score < 7) ===
+    if score_1 < 9:
+        improvement_prompt = PromptTemplate.from_template(
+            "The following content was scraped from the web for the question:\n{question}\n\nScraped Answer:\n{answer}\n\nCritic Feedback:\n{feedback}\n\nUsing this feedback, write a clearer, more complete, and accurate educational answer:"
+        )
+        chain = LLMChain(llm=llm, prompt=improvement_prompt)
+        final_answer = chain.run({
+            "question": question,
+            "answer": initial_answer,
+            "feedback": critic_feedback_1
+        })
+    else:
+        final_answer = initial_answer
+
+    # === PHASE 4: FINAL CRITIC EVALUATION ===
+    critic_payload_2 = {"question": question, "answer": final_answer}
+    try:
+        r2 = requests.post(CRITIC_URL, json=critic_payload_2).json()
+        score_2 = r2.get("score", 0)
+        critic_feedback_2 = r2.get("feedback", "")
+    except Exception as e:
+        score_2 = 0
+        critic_feedback_2 = f"Critic 2 failed: {e}"
+
+    return {
+        "question": question,
+        "initial_answer": initial_answer,
+        "critic_feedback_1": critic_feedback_1,
+        "score_1": score_1,
+        "final_answer": final_answer,
+        "critic_feedback_2": critic_feedback_2,
+        "score_2": score_2
+    }
+
 
 
