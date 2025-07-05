@@ -1,54 +1,47 @@
-
 import requests
-import json
-from logger import save_to_pdf, sanitize_text  
+from logger import sanitize_text, save_to_pdf
 
-MCP_SERVER_URL = "https://f157-2405-201-6806-f03e-6844-38b1-1f36-2b6b.ngrok-free.app/invoke"
-
-def main():
-    print(" MCP Client (Educational Assistant)")
-    question = input("Enter your question: ").strip()
-    context = {}
-
-    payload = {
-        "input": question,
-        "context": context
-    }
-
-    print("\n⏳ Sending request to MCP Tool Server...")
+def ask_question(question):
     try:
         response = requests.post(
-            MCP_SERVER_URL,
-            headers={"Content-Type": "application/json"},
-            data=json.dumps(payload)
+            "http://localhost:8000/invoke",
+            json={"input": question}
         )
-
-        if response.status_code == 200:
-            result = response.json()
-            output = result.get("output", "")
-
-            # Clean output to prevent PDF encoding issues
-            clean_output = sanitize_text(output)
-
-            print("\n✅ Final Agent Answer:\n")
-            if "Final Agent Answer" in clean_output:
-                full_answer_block = clean_output.split("Final Agent Answer:")[-1].split("Full Scraped Content")[0].strip()
-                print(full_answer_block)
-            else:
-                print(clean_output)
-
-            with open("mcp_output.txt", "w", encoding="utf-8") as f:
-                f.write(output)
-                print("📝 Full output saved to 'mcp_output.txt'.")
-
-            save_to_pdf(output, filename="mcp_output.pdf", question=question)
-
-        else:
-            print(f"❌ Server returned status code {response.status_code}")
-            print(response.text)
-
+        result = response.json()
     except Exception as e:
-        print(f"❌ Error communicating with MCP server: {e}")
+        print(f"❌ Failed to reach MCP server: {e}")
+        return
+
+    if "error" in result:
+        print(f"❌ MCP Server Error: {result['error']}")
+        return
+
+    
+    initial_answer = result.get("initial_answer", "")
+    critic_feedback_1 = result.get("critic_feedback_1", "")
+    final_answer = result.get("final_answer", "")
+    critic_feedback_2 = result.get("critic_feedback_2", "")
+    score_1 = result.get("score_1", 0)
+    score_2 = result.get("score_2", 0)
+
+    print("\n--- MCP Educational Assistant Output ---")
+    print(f"\n📌 Question:\n{question}")
+    print(f"\n📖 Initial Answer:\n{initial_answer}")
+    print(f"\n🧠 Critic Feedback (Initial Answer):\n{critic_feedback_1} (Score: {score_1})")
+    print(f"\n✅ Final Improved Answer:\n{final_answer}")
+    print(f"\n🧠 Critic Feedback (Final Answer):\n{critic_feedback_2} (Score: {score_2})")
+
+    
+    sections = {
+        "Question": sanitize_text(question),
+        "Initial Answer": sanitize_text(initial_answer),
+        "Critic Feedback (Initial Answer)": sanitize_text(f"{critic_feedback_1} (Score: {score_1})"),
+        "Final Improved Answer": sanitize_text(final_answer),
+        "Critic Feedback (Final Answer)": sanitize_text(f"{critic_feedback_2} (Score: {score_2})"),
+    }
+
+    save_to_pdf(sections, filename="mcp_output.pdf")
 
 if __name__ == "__main__":
-    main()
+    user_question = input("Enter your educational question: ")
+    ask_question(user_question)
