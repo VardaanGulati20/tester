@@ -28,11 +28,10 @@ CRITIC_URL = "http://localhost:8002/evaluate"
 def invoke_tool(input: QuestionInput):
     question = input.input
 
-    # === PHASE 1: SCRAPING ===
+ 
     scraped_content = scrape_web(question)
     initial_answer = scraped_content
 
-    # === PHASE 2: INITIAL CRITIC EVALUATION ===
     critic_payload_1 = {"question": question, "answer": initial_answer}
     try:
         r1 = requests.post(CRITIC_URL, json=critic_payload_1).json()
@@ -42,7 +41,6 @@ def invoke_tool(input: QuestionInput):
         score_1 = 0
         critic_feedback_1 = f"Critic 1 failed: {e}"
 
-    # === PHASE 3: LLM IMPROVEMENT (only if score < 7) ===
     if score_1 < 9:
         improvement_prompt = PromptTemplate.from_template(
             "The following content was scraped from the web for the question:\n{question}\n\nScraped Answer:\n{answer}\n\nCritic Feedback:\n{feedback}\n\nUsing this feedback, write a clearer, more complete, and accurate educational answer:"
@@ -56,7 +54,6 @@ def invoke_tool(input: QuestionInput):
     else:
         final_answer = initial_answer
 
-    # === PHASE 4: FINAL CRITIC EVALUATION ===
     critic_payload_2 = {"question": question, "answer": final_answer}
     try:
         r2 = requests.post(CRITIC_URL, json=critic_payload_2).json()
