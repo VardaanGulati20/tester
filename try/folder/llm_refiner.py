@@ -6,21 +6,13 @@ from langchain_groq import ChatGroq
 import os, json, requests
 from dotenv import load_dotenv
 
-# ----------------------------
-# 🔑 Load Keys
-# ----------------------------
+
 load_dotenv()
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 REGISTRY_URL = os.getenv("REGISTRY_URL", "http://localhost:9000")
 
-# ----------------------------
-# ⚙️ FastAPI Setup
-# ----------------------------
 app = FastAPI()
 
-# ----------------------------
-# 🤖 LLM Setup
-# ----------------------------
 llm = ChatGroq(
     model_name="llama3-70b-8192",
     temperature=0.5,
@@ -47,9 +39,6 @@ Return only the improved answer below:
 
 refine_chain = LLMChain(llm=llm, prompt=refiner_prompt)
 
-# ----------------------------
-# 🔁 Self-register with Registry
-# ----------------------------
 AGENT_CARD = {
     "id": "llm-refiner",
     "name": "LLM Refiner",
@@ -70,18 +59,12 @@ except Exception as e:
 def agent_card():
     return AGENT_CARD
 
-# ----------------------------
-# 📡 A2A Model Definition
-# ----------------------------
 class A2ARequest(BaseModel):
     input: str
     context: dict
     pipeline_trace: list = []
     intent: str = ""
 
-# ----------------------------
-# 🚀 A2A Endpoint
-# ----------------------------
 @app.post("/a2a")
 def a2a_handler(req: A2ARequest):
     question = req.input
@@ -124,9 +107,6 @@ def a2a_handler(req: A2ARequest):
             "status": "error"
         }
 
-# ----------------------------
-# ✅ Health Check
-# ----------------------------
 @app.get("/")
 def health_check():
     return {"status": "LLM Refiner tool is running"}
