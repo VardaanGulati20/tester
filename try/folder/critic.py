@@ -6,21 +6,14 @@ from langchain_groq import ChatGroq
 import os, json, requests, re
 from dotenv import load_dotenv
 
-# ----------------------------
-# 🔑 Load Keys
-# ----------------------------
+
 load_dotenv()
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 REGISTRY_URL = os.getenv("REGISTRY_URL", "http://localhost:9000")
 
-# ----------------------------
-# ⚙️ FastAPI Setup
-# ----------------------------
 app = FastAPI()
 
-# ----------------------------
-# 🤖 LLM Setup for Critic
-# ----------------------------
+
 llm = ChatGroq(
     model_name="llama3-70b-8192",
     temperature=0.2,
@@ -46,9 +39,6 @@ Critique the answer constructively. Then provide a numeric score from 1 (poor) t
 
 chain = LLMChain(llm=llm, prompt=critic_prompt)
 
-# ----------------------------
-# 🔁 Self-register with Registry
-# ----------------------------
 AGENT_CARD = {
     "id": "critic-tool",
     "name": "Critic Tool",
@@ -69,18 +59,12 @@ except Exception as e:
 def agent_card():
     return AGENT_CARD
 
-# ----------------------------
-# 📡 A2A Model
-# ----------------------------
 class A2ARequest(BaseModel):
     input: str
     context: dict
     pipeline_trace: list = []
     intent: str = ""
 
-# ----------------------------
-# 🤖 A2A Endpoint with retry loop
-# ----------------------------
 MAX_ITER = 2
 
 @app.post("/a2a")
@@ -99,11 +83,11 @@ def a2a_handler(req: A2ARequest):
             "answer": answer
         })
 
-        # Handle result type safely
+
         result_text = result if isinstance(result, str) else result.get("text", str(result))
         print(f" Raw Critic Result:\n{result_text}")
 
-        # Extract JSON content from string using regex
+        
         match = re.search(r"\{[\s\S]*?\}", result_text)
         json_str = match.group(0) if match else result_text
 
@@ -194,9 +178,7 @@ def a2a_handler(req: A2ARequest):
         })
         return {"answer": answer, "pipeline_trace": trace, "status": "error"}
 
-# ----------------------------
-# ✅ Health Check
-# ----------------------------
+
 @app.get("/")
 def health_check():
     return {"status": "Critic tool (A2A-enabled) is running"}
